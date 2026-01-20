@@ -146,6 +146,10 @@ The repository uses **mock embeddings by default** (100% free) for testing. Vert
 
 ### GCP Deployment
 
+**Recommended:** Use the automated deployment script (see "GCP Deployment & Testing" section below) which auto-detects your IP.
+
+**Manual Terraform deployment:**
+
 1. **Set up GCP credentials**
    ```bash
    gcloud auth application-default login
@@ -162,6 +166,7 @@ The repository uses **mock embeddings by default** (100% free) for testing. Vert
 3. **Deploy infrastructure**
    ```bash
    terraform init
+   # Your public IP is auto-detected below for firewall rules
    terraform plan -var="project_id=$GOOGLE_PROJECT" \
                   -var="allowed_ip=$(curl -s ifconfig.me)/32" \
                   -var="neo4j_password=YOUR_SECURE_PASSWORD"
@@ -333,7 +338,7 @@ The `deploy_and_test.sh` script automates the complete deployment and testing wo
 # Set required environment variables
 export GCP_PROJECT_ID="your-gcp-project-id"
 export NEO4J_PASSWORD="YourSecurePassword123"
-export ALLOWED_IP="$(curl -s ifconfig.me)/32"
+# ALLOWED_IP is auto-detected (your public IP)
 
 # Deploy, test, and keep infrastructure running
 ./deploy_and_test.sh
@@ -365,7 +370,8 @@ To use the GCP deployment workflow, configure these secrets in your repository:
 | `GCP_CREDENTIALS` | Service account JSON key with Compute Engine permissions | See setup below |
 | `GCP_PROJECT_ID` | Your GCP project ID | `gcloud config get-value project` |
 | `NEO4J_PASSWORD` | Password for Neo4j (min 8 chars) | Choose a secure password |
-| `ALLOWED_IP` | Your IP in CIDR format for firewall | `echo "$(curl -s ifconfig.me)/32"` |
+
+**Note:** Your public IP is auto-detected for firewall rules - no manual configuration needed.
 
 **Setting Up GitHub Secrets:**
 
@@ -407,7 +413,6 @@ To use the GCP deployment workflow, configure these secrets in your repository:
    - `GCP_CREDENTIALS`: Paste the entire JSON content from `gcp-sa-key.json`
    - `GCP_PROJECT_ID`: Your project ID (e.g., `my-project-12345`)
    - `NEO4J_PASSWORD`: Your chosen password (min 8 characters)
-   - `ALLOWED_IP`: Your IP in CIDR format (e.g., `203.0.113.42/32`)
 
 **Running the Workflow:**
 

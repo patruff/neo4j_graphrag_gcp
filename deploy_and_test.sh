@@ -18,9 +18,9 @@ set -euo pipefail
 # Required Environment Variables:
 #   GCP_PROJECT_ID    - Your GCP project ID
 #   NEO4J_PASSWORD    - Password for Neo4j (min 8 chars)
-#   ALLOWED_IP        - Your IP in CIDR format (e.g., "1.2.3.4/32")
 #
 # Optional:
+#   ALLOWED_IP        - Your IP in CIDR format (auto-detected if not set)
 #   TF_VAR_region     - GCP region (default: us-central1)
 #   TF_VAR_zone       - GCP zone (default: us-central1-a)
 #
@@ -83,10 +83,6 @@ check_env_vars() {
         missing_vars+=("NEO4J_PASSWORD")
     fi
 
-    if [[ -z "${ALLOWED_IP:-}" ]]; then
-        missing_vars+=("ALLOWED_IP")
-    fi
-
     if [[ ${#missing_vars[@]} -ne 0 ]]; then
         log_error "Missing required environment variables:"
         for var in "${missing_vars[@]}"; do
@@ -96,9 +92,34 @@ check_env_vars() {
         echo "Example usage:"
         echo "  export GCP_PROJECT_ID='my-gcp-project'"
         echo "  export NEO4J_PASSWORD='SecurePassword123'"
-        echo "  export ALLOWED_IP='\$(curl -s ifconfig.me)/32'"
         echo "  ./deploy_and_test.sh"
         exit 1
+    fi
+}
+
+# Auto-detect allowed IP if not set
+detect_allowed_ip() {
+    if [[ -z "${ALLOWED_IP:-}" ]]; then
+        log_info "Auto-detecting your public IP address..."
+
+        # Try multiple services for reliability
+        local detected_ip=""
+        for service in "ifconfig.me" "icanhazip.com" "ipinfo.io/ip"; do
+            if detected_ip=$(curl -s --max-time 5 "https://$service" 2>/dev/null); then
+                # Validate IP format (basic check)
+                if [[ $detected_ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+                    ALLOWED_IP="${detected_ip}/32"
+                    log_success "Auto-detected IP: $ALLOWED_IP"
+                    return 0
+                fi
+            fi
+        done
+
+        log_error "Failed to auto-detect IP address. Please set ALLOWED_IP manually:"
+        echo "  export ALLOWED_IP='1.2.3.4/32'"
+        exit 1
+    else
+        log_info "Using provided ALLOWED_IP: $ALLOWED_IP"
     fi
 }
 
@@ -256,6 +277,7 @@ main() {
 
     # Preflight checks
     check_env_vars
+    detect_allowed_ip
     check_gcloud_auth
     check_terraform
 

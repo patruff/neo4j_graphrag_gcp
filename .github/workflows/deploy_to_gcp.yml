@@ -54,7 +54,7 @@ jobs:
         env:
           GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
           NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
-          ALLOWED_IP: ${{ secrets.ALLOWED_IP }}
+          # ALLOWED_IP is auto-detected by the script
         run: |
           chmod +x deploy_and_test.sh
 
@@ -97,9 +97,12 @@ jobs:
       - name: Cleanup on Failure
         if: failure() && inputs.destroy_after_test
         run: |
+          # Auto-detect IP for cleanup (or use dummy value since we're destroying)
+          CLEANUP_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || echo "0.0.0.0")/32
+
           cd terraform
           terraform destroy \
             -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
-            -var="allowed_ip=${{ secrets.ALLOWED_IP }}" \
+            -var="allowed_ip=$CLEANUP_IP" \
             -var="neo4j_password=${{ secrets.NEO4J_PASSWORD }}" \
             -auto-approve || true
