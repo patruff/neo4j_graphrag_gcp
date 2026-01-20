@@ -104,11 +104,18 @@ python src/vertex_ai_example.py
 
 | Model | Context Window | Use Case | Cost (per 1M tokens) |
 |-------|---------------|----------|----------------------|
+| `gemini-3-flash-preview` ⭐ | 1M tokens | **Latest! Best reasoning + speed** | Input: $0.075, Output: $0.30 |
 | `gemini-1.5-flash` | 1M tokens | Fast, cost-effective | Input: $0.075, Output: $0.30 |
 | `gemini-1.5-pro` | 2M tokens | Complex reasoning | Input: $1.25, Output: $5.00 |
-| `gemini-2.0-flash-exp` | 1M tokens | Experimental, latest | Free (during preview) |
+| `gemini-2.0-flash-exp` | 1M tokens | Experimental (deprecated) | Free (during preview) |
 
-**Recommendation:** Use `gemini-1.5-flash` for most GraphRAG use cases.
+**Recommendation:** Use `gemini-3-flash-preview` for best performance. It combines Gemini 3 Pro's reasoning with Flash's speed and cost-efficiency.
+
+**Gemini 3 Flash Features:**
+- **Thinking levels**: Control internal reasoning (minimal, low, medium, high)
+- **Enhanced multimodal**: Better image, video, audio processing (up to "ultra high" resolution)
+- **Streaming function calls**: Improved tool use with partial argument streaming
+- **1M+ token context**: Up to 1,048,576 input tokens, 65,536 output tokens
 
 ---
 
@@ -141,15 +148,16 @@ retriever = VectorRetriever(
     embedder=embedder
 )
 
-# Initialize Gemini LLM
+# Initialize Gemini 3 Flash LLM (latest model)
 generation_config = GenerationConfig(
     temperature=0.0,
     top_p=0.95,
-    max_output_tokens=1024,
+    top_k=64,  # Fixed at 64 for Gemini 3
+    max_output_tokens=8192,
 )
 
 llm = VertexAILLM(
-    model_name="gemini-1.5-flash",
+    model_name="gemini-3-flash-preview",  # Latest Gemini 3 Flash
     generation_config=generation_config,
     project="your-project-id",
     location="us-central1"
@@ -162,6 +170,46 @@ rag = GraphRAG(retriever=retriever, llm=llm)
 response = rag.search("What treatments are available for arrhythmia?", retriever_config={"top_k": 5})
 print(response.answer)
 ```
+
+### Using Gemini 3 Flash Thinking Levels
+
+Gemini 3 Flash supports **thinking levels** to control the amount of internal reasoning:
+
+```python
+from vertexai.generative_models import GenerationConfig
+
+# Minimal thinking: Fastest, lowest cost (similar to Flash behavior)
+generation_config = GenerationConfig(
+    temperature=0.0,
+    thinking_level="MINIMAL"  # Options: MINIMAL, LOW, MEDIUM, HIGH
+)
+
+llm = VertexAILLM(
+    model_name="gemini-3-flash-preview",
+    generation_config=generation_config,
+    project="your-project-id",
+    location="us-central1"
+)
+
+# For complex GraphRAG queries requiring deeper reasoning
+generation_config_high = GenerationConfig(
+    temperature=0.0,
+    thinking_level="HIGH"  # More reasoning, higher latency & cost
+)
+
+llm_reasoning = VertexAILLM(
+    model_name="gemini-3-flash-preview",
+    generation_config=generation_config_high,
+    project="your-project-id",
+    location="us-central1"
+)
+```
+
+**When to use different thinking levels:**
+- `MINIMAL`: Simple queries, fast responses, lowest cost
+- `LOW`: Standard GraphRAG queries (default for most use cases)
+- `MEDIUM`: Complex multi-hop graph traversal reasoning
+- `HIGH`: Very complex analytical queries requiring deep reasoning
 
 ### Hybrid Search with Graph Traversal
 
@@ -296,11 +344,11 @@ gcloud projects add-iam-policy-binding $GCP_PROJECT_ID \
 ```python
 # For development/testing: Use smaller, cheaper models
 embedder = VertexAIEmbeddings(model_name="textembedding-gecko@003")  # $0.0001/1K chars
-llm = VertexAILLM(model_name="gemini-1.5-flash")  # Cheapest Gemini
+llm = VertexAILLM(model_name="gemini-3-flash-preview")  # Latest, best value
 
-# For production: Balance quality and cost
-embedder = VertexAIEmbeddings(model_name="text-embedding-004")  # Better quality, still cheap
-llm = VertexAILLM(model_name="gemini-1.5-flash")  # Fast and affordable
+# For production: Best quality and cost
+embedder = VertexAIEmbeddings(model_name="text-embedding-004")  # Best quality/price: $0.00002/1K chars
+llm = VertexAILLM(model_name="gemini-3-flash-preview")  # Best reasoning + speed
 ```
 
 ### 2. Batch Embeddings

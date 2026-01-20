@@ -82,17 +82,17 @@ def main():
             retrieval_query=retrieval_query
         )
 
-        # Initialize Vertex AI LLM (Gemini)
-        logger.info("Initializing Vertex AI LLM (Gemini)...")
+        # Initialize Vertex AI LLM (Gemini 3 Flash - latest model)
+        logger.info("Initializing Vertex AI LLM (Gemini 3 Flash)...")
         generation_config = GenerationConfig(
             temperature=0.0,
             top_p=0.95,
-            top_k=40,
-            max_output_tokens=1024,
+            top_k=64,  # Fixed at 64 for Gemini 3
+            max_output_tokens=8192,
         )
 
         llm = VertexAILLM(
-            model_name="gemini-1.5-flash",
+            model_name="gemini-3-flash-preview",  # Latest Gemini 3 Flash
             generation_config=generation_config,
             project=GCP_PROJECT,
             location=GCP_LOCATION
