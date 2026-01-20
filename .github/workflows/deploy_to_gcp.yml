@@ -1,0 +1,108 @@
+name: Deploy to GCP
+
+on:
+  workflow_dispatch:
+    inputs:
+      destroy_after_test:
+        description: 'Destroy infrastructure after test?'
+        required: true
+        type: boolean
+        default: true
+      skip_test:
+        description: 'Skip GraphRAG test? (deploy only)'
+        required: true
+        type: boolean
+        default: false
+
+env:
+  TERRAFORM_VERSION: '1.6.6'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  deploy-and-test:
+    name: Deploy & Test on GCP
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r src/requirements.txt
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy and Test
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+          # ALLOWED_IP is auto-detected by the script
+        run: |
+          chmod +x deploy_and_test.sh
+
+          ARGS=""
+          if [[ "${{ inputs.destroy_after_test }}" == "true" ]]; then
+            ARGS="$ARGS --destroy"
+          fi
+          if [[ "${{ inputs.skip_test }}" == "true" ]]; then
+            ARGS="$ARGS --skip-test"
+          fi
+
+          ./deploy_and_test.sh $ARGS
+
+      - name: Upload Test Results
+        if: ${{ !inputs.skip_test }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: gcp-test-results
+          path: test_results_gcp.md
+          retention-days: 30
+
+      - name: Add Test Results to Summary
+        if: ${{ !inputs.skip_test && always() }}
+        run: |
+          if [ -f test_results_gcp.md ]; then
+            echo "# GCP Deployment Test Results" >> $GITHUB_STEP_SUMMARY
+            cat test_results_gcp.md >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Get Terraform Outputs
+        if: ${{ !inputs.destroy_after_test }}
+        run: |
+          cd terraform
+          echo "## 🚀 GCP Deployment Info" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          terraform output connection_instructions >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Cleanup on Failure
+        if: failure() && inputs.destroy_after_test
+        run: |
+          # Auto-detect IP for cleanup (or use dummy value since we're destroying)
+          CLEANUP_IP=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || echo "0.0.0.0")/32
+
+          cd terraform
+          terraform destroy \
+            -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            -var="allowed_ip=$CLEANUP_IP" \
+            -var="neo4j_password=${{ secrets.NEO4J_PASSWORD }}" \
+            -auto-approve || true

@@ -146,6 +146,10 @@ The repository uses **mock embeddings by default** (100% free) for testing. Vert
 
 ### GCP Deployment
 
+**Recommended:** Use the automated deployment script (see "GCP Deployment & Testing" section below) which auto-detects your IP.
+
+**Manual Terraform deployment:**
+
 1. **Set up GCP credentials**
    ```bash
    gcloud auth application-default login
@@ -162,6 +166,7 @@ The repository uses **mock embeddings by default** (100% free) for testing. Vert
 3. **Deploy infrastructure**
    ```bash
    terraform init
+   # Your public IP is auto-detected below for firewall rules
    terraform plan -var="project_id=$GOOGLE_PROJECT" \
                   -var="allowed_ip=$(curl -s ifconfig.me)/32" \
                   -var="neo4j_password=YOUR_SECURE_PASSWORD"
@@ -320,6 +325,109 @@ No secrets needed! The workflow uses a Neo4j service container with default test
 - Check the **Actions** tab in your GitHub repository
 - Each run shows a complete test report in the job summary
 - Test artifacts are saved for 30 days
+
+---
+
+## 🚀 GCP Deployment & Testing
+
+### Local Deployment Script
+
+The `deploy_and_test.sh` script automates the complete deployment and testing workflow:
+
+```bash
+# Set required environment variables
+export GCP_PROJECT_ID="your-gcp-project-id"
+export NEO4J_PASSWORD="YourSecurePassword123"
+# ALLOWED_IP is auto-detected (your public IP)
+
+# Deploy, test, and keep infrastructure running
+./deploy_and_test.sh
+
+# Deploy, test, and destroy after test
+./deploy_and_test.sh --destroy
+
+# Deploy only (skip test)
+./deploy_and_test.sh --skip-test
+```
+
+**What it does:**
+1. ✅ Validates environment variables and authentication
+2. ✅ Deploys infrastructure to GCP with Terraform
+3. ✅ Waits for Neo4j to be ready (up to 5 minutes)
+4. ✅ Runs GraphRAG round-trip test against deployed instance
+5. ✅ Optionally destroys infrastructure after test
+
+### GitHub Actions Deployment (Optional)
+
+The repository includes an **optional** workflow (`.github/workflows/deploy_to_gcp.yml`) for deploying to GCP via GitHub Actions. This is **disabled by default** and requires manual trigger.
+
+**Required GitHub Secrets:**
+
+To use the GCP deployment workflow, configure these secrets in your repository:
+
+| Secret Name | Description | How to Get |
+|-------------|-------------|------------|
+| `GCP_CREDENTIALS` | Service account JSON key with Compute Engine permissions | See setup below |
+| `GCP_PROJECT_ID` | Your GCP project ID | `gcloud config get-value project` |
+| `NEO4J_PASSWORD` | Password for Neo4j (min 8 chars) | Choose a secure password |
+
+**Note:** Your public IP is auto-detected for firewall rules - no manual configuration needed.
+
+**Setting Up GitHub Secrets:**
+
+1. **Navigate to repository settings:**
+   ```
+   GitHub Repository → Settings → Secrets and variables → Actions → New repository secret
+   ```
+
+2. **Create GCP Service Account:**
+   ```bash
+   # Set variables
+   export PROJECT_ID="your-gcp-project-id"
+   export SA_NAME="neo4j-graphrag-deployer"
+
+   # Create service account
+   gcloud iam service-accounts create $SA_NAME \
+       --display-name="Neo4j GraphRAG GitHub Actions Deployer" \
+       --project=$PROJECT_ID
+
+   # Grant required permissions
+   gcloud projects add-iam-policy-binding $PROJECT_ID \
+       --member="serviceAccount:$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
+       --role="roles/compute.admin"
+
+   gcloud projects add-iam-policy-binding $PROJECT_ID \
+       --member="serviceAccount:$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
+       --role="roles/iam.serviceAccountUser"
+
+   # Create and download JSON key
+   gcloud iam service-accounts keys create gcp-sa-key.json \
+       --iam-account=$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com
+
+   # Copy the entire contents of gcp-sa-key.json
+   cat gcp-sa-key.json
+   # Paste into GCP_CREDENTIALS secret
+   ```
+
+3. **Add secrets to GitHub:**
+   - `GCP_CREDENTIALS`: Paste the entire JSON content from `gcp-sa-key.json`
+   - `GCP_PROJECT_ID`: Your project ID (e.g., `my-project-12345`)
+   - `NEO4J_PASSWORD`: Your chosen password (min 8 characters)
+
+**Running the Workflow:**
+
+1. Go to **Actions** tab in your GitHub repository
+2. Select **Deploy to GCP** workflow
+3. Click **Run workflow**
+4. Choose options:
+   - ✅ **Destroy after test**: Auto-cleanup (default: Yes)
+   - ✅ **Skip test**: Deploy only without testing (default: No)
+
+**Security Notes:**
+- ⚠️ Never commit `gcp-sa-key.json` to the repository
+- ⚠️ Delete local key file after adding to secrets: `rm gcp-sa-key.json`
+- ⚠️ Use least-privilege permissions (Compute Admin is minimum required)
+- ⚠️ Rotate service account keys periodically
 
 ---
 
