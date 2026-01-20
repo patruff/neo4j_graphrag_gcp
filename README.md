@@ -245,7 +245,7 @@ The test uses realistic HealthTech entities with rich relationships:
 - **Documents:** Q1 Arrhythmia Treatment Protocol, Beta-Blocker Efficacy Study
 - **Medical:** Arrhythmia (Symptom), Beta-Blocker Therapy (Treatment), Atrial Fibrillation (Diagnosis)
 
-**Relationships (17 edges):**
+**Relationships (15 edges):**
 - Medical: `TREATED_BY`, `MANIFESTS_AS`
 - Authorship: `AUTHORED_BY`, `CONTRIBUTED_BY`
 - Content: `DISCUSSES`, `ANALYZES`, `FOCUSES_ON`

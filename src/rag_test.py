@@ -207,39 +207,41 @@ class Neo4jGraphRAG:
         Args:
             relationships: List of (source_name, relationship_type, target_name)
         """
-        create_rel_query = """
-        UNWIND $rels AS rel
-        MATCH (source:HealthEntity {name: rel.source})
-        MATCH (target:HealthEntity {name: rel.target})
-        CALL apoc.create.relationship(source, rel.type, {}, target) YIELD rel AS relationship
-        RETURN count(relationship) AS created
-        """
-
-        # Fallback without APOC
-        create_rel_query_fallback = """
-        UNWIND $rels AS rel
-        MATCH (source:HealthEntity {name: rel.source})
-        MATCH (target:HealthEntity {name: rel.target})
-        CREATE (source)-[r:RELATED_TO {type: rel.type}]->(target)
-        RETURN count(r) AS created
-        """
-
-        rels_data = [
-            {"source": src, "type": rel_type, "target": tgt}
-            for src, rel_type, tgt in relationships
-        ]
+        # Create relationships without APOC using CASE statement for dynamic types
+        # This approach works with Neo4j Community Edition
+        create_rel_queries = {
+            "TREATED_BY": "CREATE (source)-[r:TREATED_BY]->(target)",
+            "MANIFESTS_AS": "CREATE (source)-[r:MANIFESTS_AS]->(target)",
+            "AUTHORED_BY": "CREATE (source)-[r:AUTHORED_BY]->(target)",
+            "CONTRIBUTED_BY": "CREATE (source)-[r:CONTRIBUTED_BY]->(target)",
+            "DISCUSSES": "CREATE (source)-[r:DISCUSSES]->(target)",
+            "ANALYZES": "CREATE (source)-[r:ANALYZES]->(target)",
+            "FOCUSES_ON": "CREATE (source)-[r:FOCUSES_ON]->(target)",
+            "WORKS_IN": "CREATE (source)-[r:WORKS_IN]->(target)",
+            "COLLABORATES_WITH": "CREATE (source)-[r:COLLABORATES_WITH]->(target)",
+            "TREATS": "CREATE (source)-[r:TREATS]->(target)",
+            "STUDIES": "CREATE (source)-[r:STUDIES]->(target)",
+        }
 
         with self.driver.session() as session:
-            try:
-                # Try with dynamic relationship type first (requires APOC)
-                result = session.run(create_rel_query, rels=rels_data)
+            created_count = 0
+            for source, rel_type, target in relationships:
+                if rel_type not in create_rel_queries:
+                    logger.warning(f"Unknown relationship type: {rel_type}, skipping")
+                    continue
+
+                query = f"""
+                MATCH (source:HealthEntity {{name: $source}})
+                MATCH (target:HealthEntity {{name: $target}})
+                {create_rel_queries[rel_type]}
+                RETURN count(r) AS created
+                """
+
+                result = session.run(query, source=source, target=target)
                 count = result.single()["created"]
-                logger.info(f"✓ Created {count} relationships")
-            except Neo4jError:
-                # Fallback to static relationship type
-                result = session.run(create_rel_query_fallback, rels=rels_data)
-                count = result.single()["created"]
-                logger.info(f"✓ Created {count} relationships (fallback mode)")
+                created_count += count
+
+            logger.info(f"✓ Created {created_count} relationships")
 
     def vector_search_with_graph(
         self,
@@ -702,7 +704,7 @@ def run_graphrag_test(neo4j_client: Neo4jGraphRAG) -> List[TestResult]:
             latency = (time.time() - start_time) * 1000
 
             expected_nodes = 9  # 2 People, 2 Orgs, 2 Docs, 3 Medical entities
-            expected_rels = 17  # Rich relationship graph
+            expected_rels = 15  # Rich relationship graph (see create_sample_health_data)
 
             if node_count == expected_nodes and rel_count == expected_rels and nodes_with_embeddings == expected_nodes:
                 results.append(TestResult(
