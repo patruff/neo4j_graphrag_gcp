@@ -1,0 +1,10 @@
+# Neo4j GraphRAG with Vertex AI support
+# Install with: pip install -r requirements-vertexai.txt
+
+# Core Neo4j GraphRAG package with Google Vertex AI support
+neo4j-graphrag[google]==0.10.3
+
+# Already included in neo4j-graphrag, but listed for clarity:
+# - neo4j>=5.15.0
+# - google-cloud-aiplatform (for Vertex AI)
+# - vertexai (for Gemini models)

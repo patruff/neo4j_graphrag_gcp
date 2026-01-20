@@ -87,8 +87,7 @@ class Neo4jGraphRAG:
                 auth=(username, password),
                 max_connection_lifetime=max_connection_lifetime,
                 max_connection_pool_size=max_connection_pool_size,
-                connection_timeout=30,
-                max_retry_time=15
+                connection_timeout=30
             )
             logger.info(f"✓ Connected to Neo4j at {uri}")
         except (ServiceUnavailable, AuthError) as e:
