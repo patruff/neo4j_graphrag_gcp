@@ -1,0 +1,19 @@
+# Example Terraform variables file
+# Copy this file to terraform.tfvars and fill in your values
+
+# GCP Project Configuration
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+zone       = "us-central1-a"
+
+# Security Configuration
+allowed_ip = "YOUR_IP_ADDRESS/32"  # Get your IP: curl ifconfig.me
+
+# Neo4j Configuration
+neo4j_password = "YourSecurePassword123!"  # Must be at least 8 characters
+
+# Optional: Instance Configuration (defaults shown)
+# machine_type       = "e2-medium"
+# instance_name      = "neo4j-graphrag-poc"
+# boot_disk_size_gb  = 30
+# data_disk_size_gb  = 50
