@@ -73,10 +73,13 @@ Neo4j 5.x+ includes **native vector indexing**, enabling a unified architecture:
 │   ├── outputs.tf                 # Deployment outputs
 │   └── cloud-init.yml             # VM initialization script
 ├── src/
-│   ├── rag_test.py                # GraphRAG round-trip test
-│   └── requirements.txt           # Python dependencies
+│   ├── rag_test.py                # GraphRAG round-trip test (mock embeddings)
+│   ├── vertex_ai_example.py       # Production example with Vertex AI
+│   ├── requirements.txt           # Python dependencies (free testing)
+│   └── requirements-vertexai.txt  # Vertex AI dependencies (production)
 ├── docker-compose.yml             # Local development setup
 ├── SAMPLE_QUERIES.md              # Knowledge graph vs vector search examples
+├── VERTEX_AI_SETUP.md             # Production setup with Google Vertex AI
 ├── CONTRIBUTING.md                # Contribution guidelines
 ├── .gitignore
 └── README.md
@@ -122,6 +125,24 @@ Neo4j 5.x+ includes **native vector indexing**, enabling a unified architecture:
    ```bash
    cat test_results.md
    ```
+
+### Production Setup with Vertex AI (Optional)
+
+For **production use** with **real embeddings and LLM**, see [VERTEX_AI_SETUP.md](VERTEX_AI_SETUP.md) for complete instructions on using Google Vertex AI:
+
+- **Real embeddings** with `textembedding-gecko` or `text-embedding-004`
+- **Gemini LLM** for answer generation
+- **GraphRAG pipeline** with production-ready models
+- **Cost**: ~$1-5/month for experimentation (NOT free tier)
+
+```bash
+# Quick start with Vertex AI
+pip install neo4j-graphrag[google]
+export GCP_PROJECT_ID="your-project-id"
+python src/vertex_ai_example.py
+```
+
+The repository uses **mock embeddings by default** (100% free) for testing. Vertex AI is **optional** for production deployments.
 
 ### GCP Deployment
 
@@ -199,7 +220,9 @@ This deployment is configured to run **100% FREE** within GCP's Always Free tier
 
 ## 🧪 Testing & Validation
 
-The `rag_test.py` script performs a comprehensive **round-trip verification**:
+The `rag_test.py` script performs a comprehensive **round-trip verification** using **mock embeddings** (deterministic random vectors for testing).
+
+**Note:** This test uses mock embeddings to ensure 100% free operation. For production use with **real embeddings**, see [VERTEX_AI_SETUP.md](VERTEX_AI_SETUP.md) to integrate Google Vertex AI.
 
 ### Test Suite
 
