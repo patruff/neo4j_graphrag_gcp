@@ -76,6 +76,8 @@ Neo4j 5.x+ includes **native vector indexing**, enabling a unified architecture:
 │   ├── rag_test.py                # GraphRAG round-trip test
 │   └── requirements.txt           # Python dependencies
 ├── docker-compose.yml             # Local development setup
+├── SAMPLE_QUERIES.md              # Knowledge graph vs vector search examples
+├── CONTRIBUTING.md                # Contribution guidelines
 ├── .gitignore
 └── README.md
 ```
@@ -197,23 +199,39 @@ The `rag_test.py` script performs a comprehensive **round-trip verification**:
 | 2 | Database Initialization | Create vector index and clear existing data |
 | 3 | Data Ingestion | Insert health documents with embeddings and relationships |
 | 4 | Hybrid Vector + Graph Search | Verify vector search returns correct results with graph context |
-| 5 | Data Consistency Verification | Ensure all nodes have embeddings and relationships intact |
+| 5 | **Knowledge Graph Traversal** | **Demonstrate queries impossible with pure vector search** |
+| 6 | Data Consistency Verification | Ensure all nodes have embeddings and relationships intact |
 
 ### Sample Data
 
-The test uses realistic HealthTech entities:
+The test uses realistic HealthTech entities with rich relationships:
 
-```python
-Nodes:
-  1. Symptom: "Arrhythmia" (with embedding)
-  2. Drug: "Beta-Blocker" (with embedding)
-  3. Diagnosis: "Atrial Fibrillation" (with embedding)
+**Entities (9 nodes):**
+- **People:** Dr. Sarah Chen (Cardiologist), Dr. Marcus Liu (Researcher)
+- **Organizations:** Cardiology Department, Clinical Research Team
+- **Documents:** Q1 Arrhythmia Treatment Protocol, Beta-Blocker Efficacy Study
+- **Medical:** Arrhythmia (Symptom), Beta-Blocker Therapy (Treatment), Atrial Fibrillation (Diagnosis)
 
-Relationships:
-  (Arrhythmia) -[:TREATED_BY]-> (Beta-Blocker)
-  (Arrhythmia) -[:MANIFESTS_AS]-> (Atrial Fibrillation)
-  (Atrial Fibrillation) -[:TREATED_BY]-> (Beta-Blocker)
+**Relationships (17 edges):**
+- Medical: `TREATED_BY`, `MANIFESTS_AS`
+- Authorship: `AUTHORED_BY`, `CONTRIBUTED_BY`
+- Content: `DISCUSSES`, `ANALYZES`, `FOCUSES_ON`
+- Organizational: `WORKS_IN`, `COLLABORATES_WITH`, `TREATS`, `STUDIES`
+
+### Knowledge Graph Query Example
+
+Test 5 demonstrates a query **impossible with pure vector search**:
+
+```cypher
+// "Find documents authored by people in Cardiology who discuss Arrhythmia"
+MATCH (dept:HealthEntity {name: 'Cardiology Department'})
+MATCH (person:HealthEntity)-[:WORKS_IN]->(dept)
+MATCH (doc:HealthEntity)-[:AUTHORED_BY]->(person)
+MATCH (doc)-[:DISCUSSES]->(topic:HealthEntity {name: 'Arrhythmia'})
+RETURN doc.name, person.name, dept.name
 ```
+
+This multi-hop traversal query requires understanding entity relationships - something vector search alone cannot do.
 
 ### Expected Output
 
@@ -222,10 +240,19 @@ Relationships:
 ✓ Database Initialization (1,234.56ms)
 ✓ Data Ingestion (234.56ms)
 ✓ Hybrid Vector + Graph Search (45.67ms)
-✓ Data Consistency Verification (23.45ms)
+✓ Knowledge Graph Traversal (23.45ms) [IMPOSSIBLE with vector-only!]
+✓ Data Consistency Verification (18.90ms)
 
-5/5 tests passed
+6/6 tests passed
 ```
+
+### Sample Queries
+
+See [SAMPLE_QUERIES.md](SAMPLE_QUERIES.md) for comprehensive examples showing:
+- Pure vector search queries
+- Knowledge graph traversal queries
+- Hybrid queries combining both
+- Comparison: What vector search CAN'T do vs what GraphRAG CAN do
 
 ---
 

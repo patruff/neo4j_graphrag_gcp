@@ -310,13 +310,93 @@ def generate_mock_embedding(seed: int, dimension: int = 1536) -> List[float]:
 
 
 def create_sample_health_data() -> Tuple[List[HealthTechDocument], List[Tuple[str, str, str]]]:
-    """Create sample health tech documents and relationships."""
+    """
+    Create sample health tech documents with rich entity relationships.
+
+    This demonstrates the power of Knowledge Graphs over pure vector search:
+    - Entities: People, Organizations, Documents, Symptoms, Treatments
+    - Relationships: AUTHORED_BY, DISCUSSED_WITH, TREATS, COLLABORATES_WITH
+    - Use cases: "Who discussed X with Y?", "What did Alice work on with Bob?"
+    """
 
     documents = [
+        # People
+        HealthTechDocument(
+            node_type="Person",
+            name="Dr. Sarah Chen",
+            description="Senior cardiologist specializing in arrhythmia treatment and digital health interventions",
+            embedding=generate_mock_embedding(seed=100),
+            properties={
+                "role": "Senior Cardiologist",
+                "department": "Cardiology",
+                "specialization": "Arrhythmia"
+            }
+        ),
+        HealthTechDocument(
+            node_type="Person",
+            name="Dr. Marcus Liu",
+            description="Clinical researcher focused on beta-blocker efficacy and cardiovascular pharmacology",
+            embedding=generate_mock_embedding(seed=101),
+            properties={
+                "role": "Clinical Researcher",
+                "department": "Research",
+                "specialization": "Pharmacology"
+            }
+        ),
+
+        # Organizations
+        HealthTechDocument(
+            node_type="Organization",
+            name="Cardiology Department",
+            description="Hospital cardiology department providing cardiovascular care and arrhythmia treatment protocols",
+            embedding=generate_mock_embedding(seed=200),
+            properties={
+                "type": "Clinical Department",
+                "size": "large",
+                "focus": "Cardiovascular Care"
+            }
+        ),
+        HealthTechDocument(
+            node_type="Organization",
+            name="Clinical Research Team",
+            description="Cross-functional research team studying cardiovascular treatments and patient outcomes",
+            embedding=generate_mock_embedding(seed=201),
+            properties={
+                "type": "Research Team",
+                "size": "medium",
+                "focus": "Clinical Trials"
+            }
+        ),
+
+        # Clinical Documents/Discussions
+        HealthTechDocument(
+            node_type="Document",
+            name="Q1 Arrhythmia Treatment Protocol",
+            description="Quarterly review discussing updated protocols for treating arrhythmia with beta-blockers and alternative therapies",
+            embedding=generate_mock_embedding(seed=300),
+            properties={
+                "document_type": "Protocol",
+                "date": "2024-01-15",
+                "status": "approved"
+            }
+        ),
+        HealthTechDocument(
+            node_type="Document",
+            name="Beta-Blocker Efficacy Study",
+            description="Clinical study analyzing beta-blocker effectiveness in atrial fibrillation patients over 12 months",
+            embedding=generate_mock_embedding(seed=301),
+            properties={
+                "document_type": "Research Paper",
+                "date": "2024-02-20",
+                "status": "published"
+            }
+        ),
+
+        # Medical Entities
         HealthTechDocument(
             node_type="Symptom",
             name="Arrhythmia",
-            description="Irregular heartbeat characterized by abnormal heart rhythm patterns",
+            description="Irregular heartbeat characterized by abnormal heart rhythm patterns requiring immediate medical evaluation",
             embedding=generate_mock_embedding(seed=42),
             properties={
                 "severity": "high",
@@ -325,9 +405,9 @@ def create_sample_health_data() -> Tuple[List[HealthTechDocument], List[Tuple[st
             }
         ),
         HealthTechDocument(
-            node_type="Drug",
-            name="Beta-Blocker",
-            description="Medication that reduces heart rate and blood pressure by blocking adrenaline effects",
+            node_type="Treatment",
+            name="Beta-Blocker Therapy",
+            description="Medication regimen that reduces heart rate and blood pressure by blocking adrenaline effects on the heart",
             embedding=generate_mock_embedding(seed=43),
             properties={
                 "drug_class": "cardiovascular",
@@ -338,7 +418,7 @@ def create_sample_health_data() -> Tuple[List[HealthTechDocument], List[Tuple[st
         HealthTechDocument(
             node_type="Diagnosis",
             name="Atrial Fibrillation",
-            description="Specific type of arrhythmia involving rapid, irregular atrial contractions",
+            description="Specific type of arrhythmia involving rapid irregular atrial contractions causing stroke risk",
             embedding=generate_mock_embedding(seed=44),
             properties={
                 "condition_type": "chronic",
@@ -348,10 +428,32 @@ def create_sample_health_data() -> Tuple[List[HealthTechDocument], List[Tuple[st
         )
     ]
 
+    # Rich relationship graph demonstrating knowledge graph advantages
     relationships = [
-        ("Arrhythmia", "TREATED_BY", "Beta-Blocker"),
+        # Medical relationships
+        ("Arrhythmia", "TREATED_BY", "Beta-Blocker Therapy"),
         ("Arrhythmia", "MANIFESTS_AS", "Atrial Fibrillation"),
-        ("Atrial Fibrillation", "TREATED_BY", "Beta-Blocker")
+        ("Atrial Fibrillation", "TREATED_BY", "Beta-Blocker Therapy"),
+
+        # Authorship & contributions
+        ("Q1 Arrhythmia Treatment Protocol", "AUTHORED_BY", "Dr. Sarah Chen"),
+        ("Beta-Blocker Efficacy Study", "AUTHORED_BY", "Dr. Marcus Liu"),
+        ("Beta-Blocker Efficacy Study", "CONTRIBUTED_BY", "Dr. Sarah Chen"),
+
+        # Document content relationships
+        ("Q1 Arrhythmia Treatment Protocol", "DISCUSSES", "Arrhythmia"),
+        ("Q1 Arrhythmia Treatment Protocol", "DISCUSSES", "Beta-Blocker Therapy"),
+        ("Beta-Blocker Efficacy Study", "ANALYZES", "Beta-Blocker Therapy"),
+        ("Beta-Blocker Efficacy Study", "FOCUSES_ON", "Atrial Fibrillation"),
+
+        # Organizational relationships
+        ("Dr. Sarah Chen", "WORKS_IN", "Cardiology Department"),
+        ("Dr. Marcus Liu", "WORKS_IN", "Clinical Research Team"),
+        ("Dr. Sarah Chen", "COLLABORATES_WITH", "Dr. Marcus Liu"),
+
+        # Department scope
+        ("Cardiology Department", "TREATS", "Arrhythmia"),
+        ("Clinical Research Team", "STUDIES", "Beta-Blocker Therapy"),
     ]
 
     return documents, relationships
@@ -514,9 +616,74 @@ def run_graphrag_test(neo4j_client: Neo4jGraphRAG) -> List[TestResult]:
         ))
         logger.error(f"✗ FAIL: {e}")
 
-    # Test 5: Data Consistency Verification
+    # Test 5: Knowledge Graph Query (What Vector Search Can't Do)
     logger.info("\n" + "="*60)
-    logger.info("TEST 5: Data Consistency Verification")
+    logger.info("TEST 5: Knowledge Graph Traversal Query")
+    logger.info("="*60)
+    logger.info("Query: 'Find documents authored by people who work in Cardiology and discuss Arrhythmia'")
+    start_time = time.time()
+
+    try:
+        # This type of query is impossible with pure vector search
+        # It requires understanding relationships between entities
+        knowledge_graph_query = """
+        MATCH (dept:HealthEntity {name: 'Cardiology Department'})
+        MATCH (person:HealthEntity)-[:WORKS_IN]->(dept)
+        MATCH (doc:HealthEntity)-[:AUTHORED_BY]->(person)
+        MATCH (doc)-[:DISCUSSES]->(topic:HealthEntity {name: 'Arrhythmia'})
+        RETURN
+            doc.name AS document,
+            person.name AS author,
+            dept.name AS department,
+            collect(DISTINCT topic.name) AS topics
+        """
+
+        with neo4j_client.driver.session() as session:
+            result = session.run(knowledge_graph_query)
+            kg_results = [dict(record) for record in result]
+            latency = (time.time() - start_time) * 1000
+
+            logger.info(f"\nKnowledge Graph Results ({len(kg_results)} found):")
+            for idx, record in enumerate(kg_results, 1):
+                logger.info(f"\n  [{idx}] Document: {record['document']}")
+                logger.info(f"      Author: {record['author']}")
+                logger.info(f"      Department: {record['department']}")
+                logger.info(f"      Topics: {', '.join(record['topics'])}")
+
+            # Verify we found the expected document
+            if len(kg_results) > 0:
+                expected_doc = "Q1 Arrhythmia Treatment Protocol"
+                found_expected = any(r['document'] == expected_doc for r in kg_results)
+
+                if found_expected:
+                    results.append(TestResult(
+                        test_name="Knowledge Graph Traversal",
+                        status="PASS",
+                        latency_ms=round(latency, 2),
+                        details=f"Successfully queried multi-hop relationships: {len(kg_results)} documents found via graph traversal",
+                        timestamp=datetime.utcnow().isoformat()
+                    ))
+                    logger.info(f"\n✓ PASS ({latency:.2f}ms)")
+                    logger.info("✓ This query is IMPOSSIBLE with pure vector search!")
+                else:
+                    raise Exception(f"Expected to find '{expected_doc}' but didn't")
+            else:
+                raise Exception("No results from knowledge graph query")
+
+    except Exception as e:
+        latency = (time.time() - start_time) * 1000
+        results.append(TestResult(
+            test_name="Knowledge Graph Traversal",
+            status="FAIL",
+            latency_ms=round(latency, 2),
+            details=f"Knowledge graph query failed: {str(e)}",
+            timestamp=datetime.utcnow().isoformat()
+        ))
+        logger.error(f"✗ FAIL: {e}")
+
+    # Test 6: Data Consistency Verification
+    logger.info("\n" + "="*60)
+    logger.info("TEST 6: Data Consistency Verification")
     logger.info("="*60)
     start_time = time.time()
 
@@ -535,8 +702,8 @@ def run_graphrag_test(neo4j_client: Neo4jGraphRAG) -> List[TestResult]:
 
             latency = (time.time() - start_time) * 1000
 
-            expected_nodes = 3
-            expected_rels = 3
+            expected_nodes = 9  # 2 People, 2 Orgs, 2 Docs, 3 Medical entities
+            expected_rels = 17  # Rich relationship graph
 
             if node_count == expected_nodes and rel_count == expected_rels and nodes_with_embeddings == expected_nodes:
                 results.append(TestResult(
