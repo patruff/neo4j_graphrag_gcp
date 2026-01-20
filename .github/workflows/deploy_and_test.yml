@@ -1,0 +1,276 @@
+name: GraphRAG POC - Deploy & Test
+
+on:
+  push:
+    branches: [ main, develop, 'claude/**' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      deploy_to_gcp:
+        description: 'Deploy to GCP (true/false)'
+        required: false
+        default: 'false'
+
+env:
+  TERRAFORM_VERSION: '1.6.6'
+  PYTHON_VERSION: '3.11'
+  NEO4J_VERSION: '5.15.0-community'
+
+jobs:
+  terraform-lint:
+    name: Terraform Linting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Terraform Format Check
+        working-directory: ./terraform
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        working-directory: ./terraform
+        run: terraform validate
+
+      - name: ✅ Terraform Linting Complete
+        run: echo "Terraform linting and validation completed successfully"
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: terraform-lint
+
+    services:
+      neo4j:
+        image: neo4j:5.15.0-community
+        env:
+          NEO4J_AUTH: neo4j/test_password_12345
+          NEO4J_ACCEPT_LICENSE_AGREEMENT: yes
+          NEO4J_server_memory_heap_initial__size: 512m
+          NEO4J_server_memory_heap_max__size: 1g
+        ports:
+          - 7474:7474
+          - 7687:7687
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 40s
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        working-directory: ./src
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Wait for Neo4j to be ready
+        run: |
+          echo "Waiting for Neo4j to be fully ready..."
+          for i in {1..30}; do
+            if curl -f http://localhost:7474 > /dev/null 2>&1; then
+              echo "Neo4j is ready!"
+              break
+            fi
+            echo "Waiting for Neo4j... ($i/30)"
+            sleep 2
+          done
+
+      - name: Run GraphRAG Round-Trip Test
+        working-directory: ./src
+        env:
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_USER: neo4j
+          NEO4J_PASSWORD: test_password_12345
+          TEST_RESULTS_FILE: ../test_results.md
+        run: |
+          echo "=========================================="
+          echo "Running Neo4j GraphRAG Round-Trip Tests"
+          echo "=========================================="
+          python rag_test.py
+
+      - name: Display Test Results
+        if: always()
+        run: |
+          if [ -f test_results.md ]; then
+            echo "=========================================="
+            echo "TEST RESULTS"
+            echo "=========================================="
+            cat test_results.md
+          else
+            echo "❌ Test results file not found"
+            exit 1
+          fi
+
+      - name: Upload Test Results as Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test_results.md
+          retention-days: 30
+
+      - name: Add Test Results to Job Summary
+        if: always()
+        run: |
+          if [ -f test_results.md ]; then
+            echo "# Neo4j GraphRAG Test Results" >> $GITHUB_STEP_SUMMARY
+            cat test_results.md >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Update README with Test Results
+        if: github.ref == 'refs/heads/main' && success()
+        run: |
+          if [ -f test_results.md ]; then
+            # Create a marker-based replacement in README
+            if grep -q "<!-- TEST_RESULTS_START -->" README.md; then
+              # Use sed to replace content between markers
+              sed -i '/<!-- TEST_RESULTS_START -->/,/<!-- TEST_RESULTS_END -->/c\
+              <!-- TEST_RESULTS_START -->\n'"$(cat test_results.md)"'\n<!-- TEST_RESULTS_END -->' README.md
+
+              # Configure git
+              git config --global user.name 'github-actions[bot]'
+              git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+              # Commit and push if there are changes
+              git add README.md
+              if git diff --staged --quiet; then
+                echo "No changes to README.md"
+              else
+                git commit -m "chore: update test results in README [skip ci]"
+                git push
+              fi
+            else
+              echo "⚠️  README.md does not contain test results markers"
+            fi
+          fi
+
+      - name: Fail if tests failed
+        if: always()
+        run: |
+          if [ -f test_results.md ]; then
+            if grep -q "❌" test_results.md; then
+              echo "❌ Some tests failed"
+              exit 1
+            else
+              echo "✅ All tests passed"
+            fi
+          else
+            echo "❌ Test results file not found"
+            exit 1
+          fi
+
+  deploy-to-gcp:
+    name: Deploy to GCP (Manual)
+    runs-on: ubuntu-latest
+    needs: integration-test
+    if: github.event.inputs.deploy_to_gcp == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: ./terraform
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_allowed_ip: ${{ secrets.ALLOWED_IP }}
+          TF_VAR_neo4j_password: ${{ secrets.NEO4J_PASSWORD }}
+        run: |
+          terraform plan \
+            -out=tfplan \
+            -input=false
+
+      - name: Terraform Apply
+        working-directory: ./terraform
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_allowed_ip: ${{ secrets.ALLOWED_IP }}
+          TF_VAR_neo4j_password: ${{ secrets.NEO4J_PASSWORD }}
+        run: terraform apply -auto-approve tfplan
+
+      - name: Output Deployment Info
+        working-directory: ./terraform
+        run: |
+          echo "=========================================="
+          echo "DEPLOYMENT COMPLETE"
+          echo "=========================================="
+          terraform output -json > deployment_output.json
+          cat deployment_output.json
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 🚀 GCP Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Neo4j Browser:** $(terraform output -raw neo4j_http_url)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Bolt Connection:** $(terraform output -raw neo4j_bolt_url)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**SSH Command:** \`$(terraform output -raw ssh_command)\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Deployment Info
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-info
+          path: terraform/deployment_output.json
+          retention-days: 90
+
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'

@@ -1,0 +1,53 @@
+version: '3.8'
+
+# Local development/testing Docker Compose configuration
+# This file is used for local testing and GitHub Actions CI
+# Production deployment uses the cloud-init embedded version in Terraform
+
+services:
+  neo4j:
+    image: neo4j:5.15.0-community
+    container_name: neo4j-graphrag-local
+    restart: unless-stopped
+    ports:
+      - "7474:7474"  # HTTP Browser Interface
+      - "7687:7687"  # Bolt Protocol
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-test_password_12345}
+      - NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
+      # Memory settings optimized for development/testing
+      - NEO4J_server_memory_heap_initial__size=512m
+      - NEO4J_server_memory_heap_max__size=1g
+      - NEO4J_server_memory_pagecache_size=512m
+      # Enable APOC procedures (optional, but useful for advanced graph operations)
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_security_procedures_allowlist=apoc.*
+      # Enable detailed query logging for debugging
+      - NEO4J_dbms_logs_query_enabled=INFO
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_import:/var/lib/neo4j/import
+      - neo4j_plugins:/plugins
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - neo4j_network
+
+volumes:
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local
+  neo4j_import:
+    driver: local
+  neo4j_plugins:
+    driver: local
+
+networks:
+  neo4j_network:
+    driver: bridge

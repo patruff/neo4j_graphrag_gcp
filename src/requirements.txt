@@ -1,0 +1,14 @@
+# Core Neo4j driver
+neo4j==5.15.0
+
+# Type hints and validation
+typing-extensions==4.9.0
+
+# For generating mock embeddings (can be replaced with real embedding models)
+numpy==1.26.3
+
+# Optional: For colored terminal output
+colorama==0.4.6
+
+# Optional: For better structured logging
+python-json-logger==2.0.7
