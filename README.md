@@ -1,8 +1,8 @@
-# Neo4j GraphRAG on GCP - Production POC
+# Neo4j GraphRAG on GCP - 100% Free Tier POC
 
 [![GraphRAG Test](https://github.com/YOUR_USERNAME/neo4j_graphrag_gcp/actions/workflows/test_graphrag.yml/badge.svg)](https://github.com/YOUR_USERNAME/neo4j_graphrag_gcp/actions/workflows/test_graphrag.yml)
 
-A production-ready, cost-effective **Pure Neo4j GraphRAG** architecture deployed on Google Cloud Platform, designed to eliminate "Silent Failures" in RAG systems by combining vector search with graph relationships in a single database.
+A **100% free**, production-ready **Pure Neo4j GraphRAG** architecture deployed on Google Cloud Platform's Always Free Tier, designed to eliminate "Silent Failures" in RAG systems by combining vector search with graph relationships in a single database.
 
 ---
 
@@ -12,9 +12,9 @@ This repository demonstrates a complete Infrastructure-as-Code (IaC) solution fo
 
 **Key Benefits:**
 - **Unified Architecture**: Single Neo4j database for both vector search and graph relationships
+- **100% Free Deployment**: Configured for GCP Always Free Tier (e2-micro, 30GB disk, $0/month)
 - **Free Automated Testing**: GitHub Actions workflow tests GraphRAG functionality on every commit
-- **Cost-Optimized**: Spot VM pricing on GCP (up to 80% cost reduction) for production deployment
-- **Self-Healing**: Automatic recovery from instance terminations with persistent data storage
+- **Self-Healing**: Automatic recovery from reboots with persistent data storage
 - **Verifiable**: Automated round-trip testing ensures data consistency
 
 ---
@@ -161,21 +161,31 @@ Neo4j 5.x+ includes **native vector indexing**, enabling a unified architecture:
 
 ## ⚙️ Infrastructure Details
 
-### Cost Optimization
+### 🆓 GCP Always Free Tier Configuration
 
-- **Spot VMs**: Up to 80% cheaper than regular instances
-- **Right-Sized Compute**: e2-medium (2 vCPU, 4 GB RAM) sufficient for POC
-- **Standard Persistent Disk**: Cost-effective storage with adequate performance
-- **Ephemeral IP**: No reserved IP charges
+This deployment is configured to run **100% FREE** within GCP's Always Free tier limits:
 
-**Estimated Monthly Cost**: $15-25 USD (depending on region and usage)
+- **Compute**: 1 non-preemptible **e2-micro** VM instance (0.25-2 vCPU, 1 GB RAM)
+- **Storage**: 30GB standard persistent disk
+- **Region**: us-central1 (also eligible: us-west1, us-east1)
+- **Network**: 1GB outbound data transfer per month
+- **Neo4j Memory**: Optimized for 1GB RAM (128MB heap, 256MB pagecache)
+
+**Estimated Monthly Cost**: **$0** (within free tier limits) ✅
+
+**Free Tier Eligibility Requirements:**
+- Must be non-preemptible (regular VM, not Spot)
+- Must use e2-micro machine type
+- Maximum 30GB standard persistent disk
+- Must be in us-central1, us-west1, or us-east1
+- Stay under 1GB network egress per month
 
 ### High Availability Features
 
-1. **Self-Healing**: Metadata startup script automatically remounts data disk and restarts Neo4j
-2. **Persistent Storage**: Dedicated disk for Neo4j data survives instance termination
-3. **Graceful Shutdown**: 30-second termination notice on Spot VMs allows clean shutdown
-4. **Automatic Restart**: Cloud-init ensures Docker Compose starts on boot
+1. **Self-Healing**: Metadata startup script automatically restarts Neo4j on boot
+2. **Persistent Storage**: Neo4j data stored on boot disk, survives reboots
+3. **Automatic Restart**: Cloud-init ensures Docker Compose starts on boot
+4. **Standard VM**: Non-preemptible for consistent uptime (required for free tier)
 
 ### Security
 

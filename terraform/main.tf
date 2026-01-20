@@ -84,19 +84,6 @@ resource "google_project_iam_member" "neo4j_monitoring" {
   member  = "serviceAccount:${google_service_account.neo4j_sa.email}"
 }
 
-# Data disk for Neo4j persistence
-resource "google_compute_disk" "neo4j_data" {
-  name = "${var.instance_name}-data"
-  type = "pd-standard" # Cost-effective standard persistent disk
-  zone = var.zone
-  size = var.data_disk_size_gb
-
-  labels = {
-    environment = "poc"
-    component   = "neo4j-data"
-  }
-}
-
 # Cloud-init configuration with Neo4j password injection
 data "template_file" "cloud_init" {
   template = file("${path.module}/cloud-init.yml")
@@ -106,7 +93,8 @@ data "template_file" "cloud_init" {
   }
 }
 
-# Compute Engine Instance (Spot VM for cost savings)
+# Compute Engine Instance
+# Free Tier: e2-micro, non-preemptible, 30GB standard disk, us-central1/us-west1/us-east1
 resource "google_compute_instance" "neo4j_graphrag" {
   name         = var.instance_name
   machine_type = var.machine_type
@@ -114,29 +102,24 @@ resource "google_compute_instance" "neo4j_graphrag" {
 
   tags = ["neo4j-graphrag"]
 
-  # Spot VM configuration for cost optimization
+  # Scheduling: Non-preemptible for Always Free tier eligibility
+  # Spot VMs are NOT eligible for free tier!
   scheduling {
-    preemptible                 = true
-    automatic_restart           = false
-    provisioning_model          = "SPOT"
-    instance_termination_action = "STOP"
-    on_host_maintenance         = "TERMINATE"
+    preemptible       = false
+    automatic_restart = true
+    on_host_maintenance = "MIGRATE"
   }
 
   boot_disk {
     initialize_params {
       image = "ubuntu-os-cloud/ubuntu-2204-lts"
       size  = var.boot_disk_size_gb
-      type  = "pd-standard"
+      type  = "pd-standard" # Standard persistent disk (free tier eligible)
     }
   }
 
-  # Attach persistent data disk
-  attached_disk {
-    source      = google_compute_disk.neo4j_data.id
-    device_name = "neo4j-data"
-    mode        = "READ_WRITE"
-  }
+  # No separate data disk - using boot disk to stay under 30GB free tier limit
+  # Neo4j data will be stored in /opt/neo4j on the boot disk
 
   network_interface {
     network = "default"
@@ -157,33 +140,23 @@ resource "google_compute_instance" "neo4j_graphrag" {
     block-project-ssh-keys = "false"
   }
 
-  # Self-healing: metadata startup script that mounts data disk and ensures Docker Compose runs
+  # Self-healing: metadata startup script ensures Docker Compose runs
+  # Free Tier: Data stored on boot disk at /opt/neo4j (no separate disk to stay under 30GB)
   metadata_startup_script = <<-EOF
     #!/bin/bash
     set -e
 
-    # Format and mount data disk if not already mounted
-    DEVICE_NAME="/dev/disk/by-id/google-neo4j-data"
-    MOUNT_POINT="/mnt/neo4j_data"
-
-    if [ ! -d "$MOUNT_POINT" ]; then
-      mkdir -p "$MOUNT_POINT"
-    fi
-
-    # Check if disk is formatted
-    if ! blkid "$DEVICE_NAME"; then
-      mkfs.ext4 -F "$DEVICE_NAME"
-    fi
-
-    # Mount if not already mounted
-    if ! mountpoint -q "$MOUNT_POINT"; then
-      mount "$DEVICE_NAME" "$MOUNT_POINT"
-      echo "$DEVICE_NAME $MOUNT_POINT ext4 defaults,nofail 0 2" >> /etc/fstab
-    fi
+    # Ensure Neo4j data directory exists on boot disk
+    mkdir -p /opt/neo4j
 
     # Ensure Docker Compose is running (self-healing)
     cd /opt/neo4j
-    docker compose ps | grep -q "neo4j-graphrag.*Up" || docker compose up -d
+    if docker compose ps | grep -q "neo4j-graphrag.*Up"; then
+      echo "Neo4j is already running"
+    else
+      echo "Starting Neo4j..."
+      docker compose up -d
+    fi
 
     echo "Startup script completed at $(date)" >> /var/log/neo4j-startup.log
   EOF
@@ -191,14 +164,13 @@ resource "google_compute_instance" "neo4j_graphrag" {
   labels = {
     environment = "poc"
     component   = "neo4j-graphrag"
-    cost-center = "demo"
+    tier        = "free"
   }
 
   allow_stopping_for_update = true
 
   lifecycle {
     ignore_changes = [
-      scheduling[0].provisioning_model,
       metadata["ssh-keys"]
     ]
   }

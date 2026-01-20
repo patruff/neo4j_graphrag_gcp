@@ -1,9 +1,9 @@
-# Example Terraform variables file
+# Example Terraform variables file for GCP Always Free Tier deployment
 # Copy this file to terraform.tfvars and fill in your values
 
 # GCP Project Configuration
 project_id = "your-gcp-project-id"
-region     = "us-central1"
+region     = "us-central1"  # Free tier regions: us-central1, us-west1, us-east1
 zone       = "us-central1-a"
 
 # Security Configuration
@@ -12,8 +12,17 @@ allowed_ip = "YOUR_IP_ADDRESS/32"  # Get your IP: curl ifconfig.me
 # Neo4j Configuration
 neo4j_password = "YourSecurePassword123!"  # Must be at least 8 characters
 
-# Optional: Instance Configuration (defaults shown)
-# machine_type       = "e2-medium"
-# instance_name      = "neo4j-graphrag-poc"
-# boot_disk_size_gb  = 30
-# data_disk_size_gb  = 50
+# ============================================================
+# Always Free Tier Configuration (defaults - no need to set)
+# ============================================================
+# machine_type      = "e2-micro"         # Always Free: 1 e2-micro VM
+# boot_disk_size_gb = 30                 # Always Free: up to 30GB standard disk
+# use_free_tier     = true               # Enforces free tier settings
+# instance_name     = "neo4j-graphrag-poc"
+
+# ============================================================
+# To use a larger instance (will incur charges):
+# ============================================================
+# machine_type      = "e2-medium"
+# boot_disk_size_gb = 50
+# use_free_tier     = false
