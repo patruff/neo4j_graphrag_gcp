@@ -10,7 +10,7 @@ output "deployment_summary" {
     public_ip       = google_compute_instance.neo4j_graphrag.network_interface[0].access_config[0].nat_ip
     machine_type    = google_compute_instance.neo4j_graphrag.machine_type
     preemptible     = google_compute_instance.neo4j_graphrag.scheduling[0].preemptible
-    service_account = google_service_account.neo4j_sa.email
+    service_account = google_compute_instance.neo4j_graphrag.service_account[0].email
     free_tier       = var.machine_type == "e2-micro" && var.boot_disk_size_gb <= 30
   }
 }

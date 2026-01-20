@@ -64,25 +64,9 @@ resource "google_compute_firewall" "neo4j_bolt" {
   description = "Allow Neo4j Bolt protocol access from authorized IP"
 }
 
-# Service Account for the VM (principle of least privilege)
-resource "google_service_account" "neo4j_sa" {
-  account_id   = "${var.instance_name}-sa"
-  display_name = "Service Account for Neo4j GraphRAG POC"
-  description  = "Minimal permissions for Neo4j compute instance"
-}
-
-# IAM role for logging (optional but recommended for production monitoring)
-resource "google_project_iam_member" "neo4j_logging" {
-  project = var.project_id
-  role    = "roles/logging.logWriter"
-  member  = "serviceAccount:${google_service_account.neo4j_sa.email}"
-}
-
-resource "google_project_iam_member" "neo4j_monitoring" {
-  project = var.project_id
-  role    = "roles/monitoring.metricWriter"
-  member  = "serviceAccount:${google_service_account.neo4j_sa.email}"
-}
+# Service Account: Using default Compute Engine service account
+# For production, consider creating a dedicated service account with minimal permissions
+# (requires iam.serviceAccounts.create permission)
 
 # Cloud-init configuration with Neo4j password injection
 data "template_file" "cloud_init" {
@@ -131,7 +115,8 @@ resource "google_compute_instance" "neo4j_graphrag" {
   }
 
   service_account {
-    email  = google_service_account.neo4j_sa.email
+    # Use default Compute Engine service account
+    # email is omitted to use default: PROJECT_NUMBER-compute@developer.gserviceaccount.com
     scopes = ["cloud-platform"]
   }
 
