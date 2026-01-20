@@ -1,8 +1,8 @@
-# Neo4j GraphRAG on GCP - Production POC
+# Neo4j GraphRAG on GCP - 100% Free Tier POC
 
-[![GraphRAG POC - Deploy & Test](https://github.com/YOUR_USERNAME/neo4j_graphrag_gcp/actions/workflows/deploy_and_test.yml/badge.svg)](https://github.com/YOUR_USERNAME/neo4j_graphrag_gcp/actions/workflows/deploy_and_test.yml)
+[![GraphRAG Test](https://github.com/YOUR_USERNAME/neo4j_graphrag_gcp/actions/workflows/test_graphrag.yml/badge.svg)](https://github.com/YOUR_USERNAME/neo4j_graphrag_gcp/actions/workflows/test_graphrag.yml)
 
-A production-ready, cost-effective **Pure Neo4j GraphRAG** architecture deployed on Google Cloud Platform, designed to eliminate "Silent Failures" in RAG systems by combining vector search with graph relationships in a single database.
+A **100% free**, production-ready **Pure Neo4j GraphRAG** architecture deployed on Google Cloud Platform's Always Free Tier, designed to eliminate "Silent Failures" in RAG systems by combining vector search with graph relationships in a single database.
 
 ---
 
@@ -12,9 +12,9 @@ This repository demonstrates a complete Infrastructure-as-Code (IaC) solution fo
 
 **Key Benefits:**
 - **Unified Architecture**: Single Neo4j database for both vector search and graph relationships
-- **Cost-Optimized**: Spot VM pricing on GCP (up to 80% cost reduction)
-- **Self-Healing**: Automatic recovery from instance terminations with persistent data storage
-- **Production-Ready**: Complete CI/CD, monitoring, and security best practices
+- **100% Free Deployment**: Configured for GCP Always Free Tier (e2-micro, 30GB disk, $0/month)
+- **Free Automated Testing**: GitHub Actions workflow tests GraphRAG functionality on every commit
+- **Self-Healing**: Automatic recovery from reboots with persistent data storage
 - **Verifiable**: Automated round-trip testing ensures data consistency
 
 ---
@@ -66,9 +66,9 @@ Neo4j 5.x+ includes **native vector indexing**, enabling a unified architecture:
 .
 ├── .github/
 │   └── workflows/
-│       └── deploy_and_test.yml    # CI/CD pipeline
+│       └── test_graphrag.yml      # Simple GraphRAG test with Neo4j
 ├── terraform/
-│   ├── main.tf                    # GCP infrastructure
+│   ├── main.tf                    # GCP infrastructure (optional)
 │   ├── variables.tf               # Configurable parameters
 │   ├── outputs.tf                 # Deployment outputs
 │   └── cloud-init.yml             # VM initialization script
@@ -76,6 +76,8 @@ Neo4j 5.x+ includes **native vector indexing**, enabling a unified architecture:
 │   ├── rag_test.py                # GraphRAG round-trip test
 │   └── requirements.txt           # Python dependencies
 ├── docker-compose.yml             # Local development setup
+├── SAMPLE_QUERIES.md              # Knowledge graph vs vector search examples
+├── CONTRIBUTING.md                # Contribution guidelines
 ├── .gitignore
 └── README.md
 ```
@@ -86,11 +88,14 @@ Neo4j 5.x+ includes **native vector indexing**, enabling a unified architecture:
 
 ### Prerequisites
 
+**For Local Testing (Free):**
+- **Python** >= 3.11
+- **Docker** and Docker Compose
+
+**For GCP Deployment (Optional):**
 - **GCP Account** with billing enabled
 - **gcloud CLI** installed and configured
 - **Terraform** >= 1.5.0
-- **Python** >= 3.11 (for local testing)
-- **Docker** (for local testing)
 
 ### Local Testing (No GCP Required)
 
@@ -156,21 +161,31 @@ Neo4j 5.x+ includes **native vector indexing**, enabling a unified architecture:
 
 ## ⚙️ Infrastructure Details
 
-### Cost Optimization
+### 🆓 GCP Always Free Tier Configuration
 
-- **Spot VMs**: Up to 80% cheaper than regular instances
-- **Right-Sized Compute**: e2-medium (2 vCPU, 4 GB RAM) sufficient for POC
-- **Standard Persistent Disk**: Cost-effective storage with adequate performance
-- **Ephemeral IP**: No reserved IP charges
+This deployment is configured to run **100% FREE** within GCP's Always Free tier limits:
 
-**Estimated Monthly Cost**: $15-25 USD (depending on region and usage)
+- **Compute**: 1 non-preemptible **e2-micro** VM instance (0.25-2 vCPU, 1 GB RAM)
+- **Storage**: 30GB standard persistent disk
+- **Region**: us-central1 (also eligible: us-west1, us-east1)
+- **Network**: 1GB outbound data transfer per month
+- **Neo4j Memory**: Optimized for 1GB RAM (128MB heap, 256MB pagecache)
+
+**Estimated Monthly Cost**: **$0** (within free tier limits) ✅
+
+**Free Tier Eligibility Requirements:**
+- Must be non-preemptible (regular VM, not Spot)
+- Must use e2-micro machine type
+- Maximum 30GB standard persistent disk
+- Must be in us-central1, us-west1, or us-east1
+- Stay under 1GB network egress per month
 
 ### High Availability Features
 
-1. **Self-Healing**: Metadata startup script automatically remounts data disk and restarts Neo4j
-2. **Persistent Storage**: Dedicated disk for Neo4j data survives instance termination
-3. **Graceful Shutdown**: 30-second termination notice on Spot VMs allows clean shutdown
-4. **Automatic Restart**: Cloud-init ensures Docker Compose starts on boot
+1. **Self-Healing**: Metadata startup script automatically restarts Neo4j on boot
+2. **Persistent Storage**: Neo4j data stored on boot disk, survives reboots
+3. **Automatic Restart**: Cloud-init ensures Docker Compose starts on boot
+4. **Standard VM**: Non-preemptible for consistent uptime (required for free tier)
 
 ### Security
 
@@ -194,23 +209,39 @@ The `rag_test.py` script performs a comprehensive **round-trip verification**:
 | 2 | Database Initialization | Create vector index and clear existing data |
 | 3 | Data Ingestion | Insert health documents with embeddings and relationships |
 | 4 | Hybrid Vector + Graph Search | Verify vector search returns correct results with graph context |
-| 5 | Data Consistency Verification | Ensure all nodes have embeddings and relationships intact |
+| 5 | **Knowledge Graph Traversal** | **Demonstrate queries impossible with pure vector search** |
+| 6 | Data Consistency Verification | Ensure all nodes have embeddings and relationships intact |
 
 ### Sample Data
 
-The test uses realistic HealthTech entities:
+The test uses realistic HealthTech entities with rich relationships:
 
-```python
-Nodes:
-  1. Symptom: "Arrhythmia" (with embedding)
-  2. Drug: "Beta-Blocker" (with embedding)
-  3. Diagnosis: "Atrial Fibrillation" (with embedding)
+**Entities (9 nodes):**
+- **People:** Dr. Sarah Chen (Cardiologist), Dr. Marcus Liu (Researcher)
+- **Organizations:** Cardiology Department, Clinical Research Team
+- **Documents:** Q1 Arrhythmia Treatment Protocol, Beta-Blocker Efficacy Study
+- **Medical:** Arrhythmia (Symptom), Beta-Blocker Therapy (Treatment), Atrial Fibrillation (Diagnosis)
 
-Relationships:
-  (Arrhythmia) -[:TREATED_BY]-> (Beta-Blocker)
-  (Arrhythmia) -[:MANIFESTS_AS]-> (Atrial Fibrillation)
-  (Atrial Fibrillation) -[:TREATED_BY]-> (Beta-Blocker)
+**Relationships (17 edges):**
+- Medical: `TREATED_BY`, `MANIFESTS_AS`
+- Authorship: `AUTHORED_BY`, `CONTRIBUTED_BY`
+- Content: `DISCUSSES`, `ANALYZES`, `FOCUSES_ON`
+- Organizational: `WORKS_IN`, `COLLABORATES_WITH`, `TREATS`, `STUDIES`
+
+### Knowledge Graph Query Example
+
+Test 5 demonstrates a query **impossible with pure vector search**:
+
+```cypher
+// "Find documents authored by people in Cardiology who discuss Arrhythmia"
+MATCH (dept:HealthEntity {name: 'Cardiology Department'})
+MATCH (person:HealthEntity)-[:WORKS_IN]->(dept)
+MATCH (doc:HealthEntity)-[:AUTHORED_BY]->(person)
+MATCH (doc)-[:DISCUSSES]->(topic:HealthEntity {name: 'Arrhythmia'})
+RETURN doc.name, person.name, dept.name
 ```
+
+This multi-hop traversal query requires understanding entity relationships - something vector search alone cannot do.
 
 ### Expected Output
 
@@ -219,10 +250,19 @@ Relationships:
 ✓ Database Initialization (1,234.56ms)
 ✓ Data Ingestion (234.56ms)
 ✓ Hybrid Vector + Graph Search (45.67ms)
-✓ Data Consistency Verification (23.45ms)
+✓ Knowledge Graph Traversal (23.45ms) [IMPOSSIBLE with vector-only!]
+✓ Data Consistency Verification (18.90ms)
 
-5/5 tests passed
+6/6 tests passed
 ```
+
+### Sample Queries
+
+See [SAMPLE_QUERIES.md](SAMPLE_QUERIES.md) for comprehensive examples showing:
+- Pure vector search queries
+- Knowledge graph traversal queries
+- Hybrid queries combining both
+- Comparison: What vector search CAN'T do vs what GraphRAG CAN do
 
 ---
 
@@ -237,71 +277,26 @@ This section will be automatically updated by GitHub Actions after each successf
 
 ---
 
-## 🔄 CI/CD Pipeline
+## 🔄 Automated Testing
 
-The GitHub Actions workflow (`.github/workflows/deploy_and_test.yml`) provides:
+The GitHub Actions workflow (`.github/workflows/test_graphrag.yml`) provides a **simple, free GraphRAG test** that runs on every push and pull request.
 
-### Stages
+### What It Does
 
-1. **Terraform Linting**
-   - Format checking
-   - Validation
-   - Best practices enforcement
+1. **Spins up Neo4j** in a Docker service container (free on GitHub runners)
+2. **Installs dependencies** and runs the complete GraphRAG test suite
+3. **Generates test report** with pass/fail status and latency metrics
+4. **Displays results** in the GitHub Actions job summary
 
-2. **Integration Tests**
-   - Spins up Neo4j service container
-   - Runs full GraphRAG test suite
-   - Generates test report
-   - Updates README with results
+### Zero Configuration Required
 
-3. **GCP Deployment** *(Manual trigger only)*
-   - Terraform plan & apply
-   - Infrastructure provisioning
-   - Deployment verification
+No secrets needed! The workflow uses a Neo4j service container with default test credentials. Just push your code and the tests run automatically.
 
-4. **Security Scanning**
-   - Trivy vulnerability scanning
-   - SARIF upload to GitHub Security
+### View Test Results
 
-### Required GitHub Secrets
-
-Configure these in your repository settings (`Settings > Secrets and variables > Actions`):
-
-| Secret Name | Description | Example |
-|-------------|-------------|---------|
-| `GCP_CREDENTIALS` | Service account JSON key | `{"type": "service_account", ...}` |
-| `GCP_PROJECT_ID` | Your GCP project ID | `my-project-12345` |
-| `NEO4J_PASSWORD` | Neo4j database password | `SecureP@ssw0rd123` |
-| `ALLOWED_IP` | Your IP in CIDR format | `203.0.113.42/32` |
-
-### Creating GCP Service Account
-
-```bash
-# Set variables
-export PROJECT_ID="your-gcp-project-id"
-export SA_NAME="neo4j-graphrag-deployer"
-
-# Create service account
-gcloud iam service-accounts create $SA_NAME \
-    --display-name="Neo4j GraphRAG Deployer" \
-    --project=$PROJECT_ID
-
-# Grant required permissions
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/compute.admin"
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/iam.serviceAccountUser"
-
-# Create and download key
-gcloud iam service-accounts keys create gcp-credentials.json \
-    --iam-account=$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com
-
-# Copy the contents of gcp-credentials.json to GCP_CREDENTIALS secret
-cat gcp-credentials.json
-```
+- Check the **Actions** tab in your GitHub repository
+- Each run shows a complete test report in the job summary
+- Test artifacts are saved for 30 days
 
 ---
 
