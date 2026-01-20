@@ -1,6 +1,6 @@
 # Neo4j GraphRAG on GCP - Production POC
 
-[![GraphRAG POC - Deploy & Test](https://github.com/YOUR_USERNAME/neo4j_graphrag_gcp/actions/workflows/deploy_and_test.yml/badge.svg)](https://github.com/YOUR_USERNAME/neo4j_graphrag_gcp/actions/workflows/deploy_and_test.yml)
+[![GraphRAG Test](https://github.com/YOUR_USERNAME/neo4j_graphrag_gcp/actions/workflows/test_graphrag.yml/badge.svg)](https://github.com/YOUR_USERNAME/neo4j_graphrag_gcp/actions/workflows/test_graphrag.yml)
 
 A production-ready, cost-effective **Pure Neo4j GraphRAG** architecture deployed on Google Cloud Platform, designed to eliminate "Silent Failures" in RAG systems by combining vector search with graph relationships in a single database.
 
@@ -12,9 +12,9 @@ This repository demonstrates a complete Infrastructure-as-Code (IaC) solution fo
 
 **Key Benefits:**
 - **Unified Architecture**: Single Neo4j database for both vector search and graph relationships
-- **Cost-Optimized**: Spot VM pricing on GCP (up to 80% cost reduction)
+- **Free Automated Testing**: GitHub Actions workflow tests GraphRAG functionality on every commit
+- **Cost-Optimized**: Spot VM pricing on GCP (up to 80% cost reduction) for production deployment
 - **Self-Healing**: Automatic recovery from instance terminations with persistent data storage
-- **Production-Ready**: Complete CI/CD, monitoring, and security best practices
 - **Verifiable**: Automated round-trip testing ensures data consistency
 
 ---
@@ -66,9 +66,9 @@ Neo4j 5.x+ includes **native vector indexing**, enabling a unified architecture:
 .
 ├── .github/
 │   └── workflows/
-│       └── deploy_and_test.yml    # CI/CD pipeline
+│       └── test_graphrag.yml      # Simple GraphRAG test with Neo4j
 ├── terraform/
-│   ├── main.tf                    # GCP infrastructure
+│   ├── main.tf                    # GCP infrastructure (optional)
 │   ├── variables.tf               # Configurable parameters
 │   ├── outputs.tf                 # Deployment outputs
 │   └── cloud-init.yml             # VM initialization script
@@ -86,11 +86,14 @@ Neo4j 5.x+ includes **native vector indexing**, enabling a unified architecture:
 
 ### Prerequisites
 
+**For Local Testing (Free):**
+- **Python** >= 3.11
+- **Docker** and Docker Compose
+
+**For GCP Deployment (Optional):**
 - **GCP Account** with billing enabled
 - **gcloud CLI** installed and configured
 - **Terraform** >= 1.5.0
-- **Python** >= 3.11 (for local testing)
-- **Docker** (for local testing)
 
 ### Local Testing (No GCP Required)
 
@@ -237,71 +240,26 @@ This section will be automatically updated by GitHub Actions after each successf
 
 ---
 
-## 🔄 CI/CD Pipeline
+## 🔄 Automated Testing
 
-The GitHub Actions workflow (`.github/workflows/deploy_and_test.yml`) provides:
+The GitHub Actions workflow (`.github/workflows/test_graphrag.yml`) provides a **simple, free GraphRAG test** that runs on every push and pull request.
 
-### Stages
+### What It Does
 
-1. **Terraform Linting**
-   - Format checking
-   - Validation
-   - Best practices enforcement
+1. **Spins up Neo4j** in a Docker service container (free on GitHub runners)
+2. **Installs dependencies** and runs the complete GraphRAG test suite
+3. **Generates test report** with pass/fail status and latency metrics
+4. **Displays results** in the GitHub Actions job summary
 
-2. **Integration Tests**
-   - Spins up Neo4j service container
-   - Runs full GraphRAG test suite
-   - Generates test report
-   - Updates README with results
+### Zero Configuration Required
 
-3. **GCP Deployment** *(Manual trigger only)*
-   - Terraform plan & apply
-   - Infrastructure provisioning
-   - Deployment verification
+No secrets needed! The workflow uses a Neo4j service container with default test credentials. Just push your code and the tests run automatically.
 
-4. **Security Scanning**
-   - Trivy vulnerability scanning
-   - SARIF upload to GitHub Security
+### View Test Results
 
-### Required GitHub Secrets
-
-Configure these in your repository settings (`Settings > Secrets and variables > Actions`):
-
-| Secret Name | Description | Example |
-|-------------|-------------|---------|
-| `GCP_CREDENTIALS` | Service account JSON key | `{"type": "service_account", ...}` |
-| `GCP_PROJECT_ID` | Your GCP project ID | `my-project-12345` |
-| `NEO4J_PASSWORD` | Neo4j database password | `SecureP@ssw0rd123` |
-| `ALLOWED_IP` | Your IP in CIDR format | `203.0.113.42/32` |
-
-### Creating GCP Service Account
-
-```bash
-# Set variables
-export PROJECT_ID="your-gcp-project-id"
-export SA_NAME="neo4j-graphrag-deployer"
-
-# Create service account
-gcloud iam service-accounts create $SA_NAME \
-    --display-name="Neo4j GraphRAG Deployer" \
-    --project=$PROJECT_ID
-
-# Grant required permissions
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/compute.admin"
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/iam.serviceAccountUser"
-
-# Create and download key
-gcloud iam service-accounts keys create gcp-credentials.json \
-    --iam-account=$SA_NAME@$PROJECT_ID.iam.gserviceaccount.com
-
-# Copy the contents of gcp-credentials.json to GCP_CREDENTIALS secret
-cat gcp-credentials.json
-```
+- Check the **Actions** tab in your GitHub repository
+- Each run shows a complete test report in the job summary
+- Test artifacts are saved for 30 days
 
 ---
 
